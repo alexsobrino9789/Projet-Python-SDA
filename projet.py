@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-
+from datetime import date 
 # --- Configuration de la Persistance des Données ---
 CSV_FILE = 'data.csv'
 
@@ -13,7 +13,8 @@ def charger_dataframe():
     if Path(CSV_FILE).exists():
         df = pd.read_csv(CSV_FILE)
         # S'assurer que 'Date' est au format datetime pour la manipulation
-        df['Date'] = pd.to_datetime(df['Date'])
+        
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce', format='mixed')
         return df
     else:
         # Crée un DataFrame vide si le fichier n'existe pas
@@ -87,9 +88,13 @@ with st.sidebar:
 
     # 🔹 Enregistrement uniquement quand on clique sur le bouton
     if st.button("Enregistrer la transaction"):
+        # CORRECTION DE L'ERREUR: Convierte el objeto datetime.date a una cadena de texto (string)
+        V
+        date_formattee = date_saisie.strftime('%Y-%m-%d')
+        
         # Création du DataFrame pour la nouvelle ligne
         df_nouvelle_ligne = pd.DataFrame([{
-            'Date': date_saisie,
+            'Date': date_formattee, # Usamos la fecha formateada como string
             'Type': type_saisi,
             'Montant': montant_saisi,
             'Catégorie': categorie_saisie
@@ -107,7 +112,7 @@ with st.sidebar:
         st.success("Transaction enregistrée !")
         st.rerun() # Force l'actualisation de la page
 
-# Partie 4 - Dashboard Résumé (Calculs et Visualisation)
+# Parte 4 - Dashboard Résumé (Calculs et Visualisation)
 # On affiche le tableau de bord uniquement si le DataFrame n'est pas vide
 
 if not df.empty:
@@ -153,7 +158,7 @@ else:
 
 st.subheader("Historique des Transactions")
 
-# Affiche le DataFrame mis à jour et persistant
+# Affiche le DataFrame mis a jour et persistant
 st.dataframe(
     df,
     width='stretch',
@@ -167,29 +172,38 @@ st.dataframe(
 st.subheader("Supprimer une transaction")
 
 if not df.empty:
-    # Créer une liste de descriptions (incluant l'index) pour le selectbox
+    # Crear una lista de descripciones (incluyendo el índice) para el selectbox
+    
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce', format='mixed')
+    
     options_suppression = [
         # Formatage de la date en chaîne de caractères pour l'affichage
         f"{i} | {row['Date'].strftime('%Y-%m-%d')} | {row['Type']} | {row['Montant']} € | {row['Catégorie']}"
         for i, row in df.iterrows()
+        # Filtrar solo si la fecha no es NaT, para evitar errores en strftime
+        if not pd.isna(row['Date']) 
     ]
+    
+    # Manejar el caso donde no hay opciones válidas después del filtrado
+    if options_suppression:
+        choix_suppression = st.selectbox("Sélectionnez la transaction à supprimer", options_suppression)
 
-    choix_suppression = st.selectbox("Sélectionnez la transaction à supprimer", options_suppression)
-
-    if st.button("Supprimer la transaction"):
-        # Récupérer l'index (la première partie de la chaîne de caractères sélectionnée)
-        index_suppression = int(choix_suppression.split(" | ")[0])
-        
-        # Supprimer la ligne du DataFrame
-        st.session_state.df_transactions = st.session_state.df_transactions.drop(index=index_suppression)
-        
-        # Réinitialiser l'index pour éviter les problèmes de suppression ultérieure
-        st.session_state.df_transactions.reset_index(drop=True, inplace=True)
-        
-        # Sauvegarde immédiate du DataFrame mis à jour dans le CSV
-        st.session_state.df_transactions.to_csv(CSV_FILE, index=False)
-        
-        st.success("Transaction supprimée !")
-        st.rerun() # Force le rechargement de la page pour mettre à jour l'affichage
+        if st.button("Supprimer la transaction"):
+            # Récupérer l'index (la première partie de la chaîne de caractères sélectionnée)
+            index_suppression = int(choix_suppression.split(" | ")[0])
+            
+            # Supprimer la ligne du DataFrame
+            st.session_state.df_transactions = st.session_state.df_transactions.drop(index=index_suppression)
+            
+            # Réinitialiser l'index pour éviter les problèmes de suppression ultérieure
+            st.session_state.df_transactions.reset_index(drop=True, inplace=True)
+            
+            # Sauvegarde immédiate du DataFrame mis à jour dans le CSV
+            st.session_state.df_transactions.to_csv(CSV_FILE, index=False)
+            
+            st.success("Transaction supprimée !")
+            st.rerun() # Force le rechargement de la page pour mettre à jour l'affichage
+    else:
+        st.info("Aucune transaction valide à supprimer (vérifiez le format des dates).")
 else:
     st.info("Aucune transaction à supprimer.")
